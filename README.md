@@ -52,7 +52,7 @@ VALUE
 ### Delete
 You can delete the `KEY` with the command using the `Authorization:` header
 ```
-curl -v -X DELETE http://127.0.0.1:8080/4 -H 'Authorization: Bearer JWT.TOKEN'
+curl -v -X DELETE http://127.0.0.1:8080/KEY -H 'Authorization: Bearer JWT.TOKEN'
 ```
 after which the `KEY` will not be found
 ```
