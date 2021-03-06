@@ -147,7 +147,6 @@ func (l *logHandle) Read(p []byte) (n int, err error) {
 }
 
 func (l *logHandle) Close() error {
-	log.Println("close body")
 	return l.b.Close()
 }
 
