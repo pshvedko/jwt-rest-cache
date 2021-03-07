@@ -80,9 +80,9 @@ func main() {
 	a := Cache{Mapper: &sync.Map{}}
 	h := mux.NewRouter()
 	h.HandleFunc("/", a.Keys).Methods(http.MethodGet)
-	h.HandleFunc("/{key}", a.Get).Methods(http.MethodGet)
-	h.HandleFunc("/{key}", a.Put).Methods(http.MethodPut)
-	h.HandleFunc("/{key}", a.Delete).Methods(http.MethodDelete)
+	h.HandleFunc("/{_:.+}", a.Get).Methods(http.MethodGet)
+	h.HandleFunc("/{_:.+}", a.Put).Methods(http.MethodPut)
+	h.HandleFunc("/{_:.+}", a.Delete).Methods(http.MethodDelete)
 	h.Use(logMiddleware)
 	h.Use(jwtMiddleware)
 	err := http.ListenAndServe(":8080", h)
