@@ -23,21 +23,12 @@ type Mapper interface {
 
 type Cache struct {
 	Mapper
+	Size int
 }
 
 type Content struct {
 	Type []string
 	bytes.Buffer
-}
-
-func (c *Content) ReadFrom(r io.ReadCloser) (n int64, err error) {
-	defer func() {
-		p := recover()
-		if p != nil {
-			err = fmt.Errorf("%v", p)
-		}
-	}()
-	return c.Buffer.ReadFrom(r)
 }
 
 func (c *Cache) Keys(w http.ResponseWriter, r *http.Request) {
@@ -62,14 +53,44 @@ func (c *Cache) Get(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func (c *Cache) Put(w http.ResponseWriter, r *http.Request) {
-	b := Content{Type: r.Header["Content-Type"]}
-	_, err := b.ReadFrom(r.Body)
-	if err == nil {
-		c.Mapper.Store(r.URL.Path[1:], b)
+type Limit struct {
+	io.Reader
+	Size int
+}
+
+func (l *Limit) Read(p []byte) (n int, err error) {
+	if l.Size < len(p) {
+		if l.Size == 0 {
+			return 0, bytes.ErrTooLarge
+		}
+		p = p[:l.Size]
+	}
+	n, err = l.Reader.Read(p)
+	if err != nil {
 		return
 	}
-	w.WriteHeader(http.StatusInternalServerError)
+	l.Size -= n
+	return
+}
+
+func (c *Cache) Limit(r io.Reader) io.Reader {
+	if c.Size > 0 {
+		return &Limit{Reader: r, Size: c.Size}
+	}
+	return r
+}
+
+func (c *Cache) Put(w http.ResponseWriter, r *http.Request) {
+	b := Content{Type: r.Header["Content-Type"]}
+	_, err := b.ReadFrom(c.Limit(r.Body))
+	switch err {
+	case nil:
+		c.Mapper.Store(r.URL.Path[1:], b)
+	case bytes.ErrTooLarge:
+		w.WriteHeader(http.StatusInsufficientStorage)
+	default:
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 func (c *Cache) Delete(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +98,7 @@ func (c *Cache) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	a := Cache{Mapper: &sync.Map{}}
+	a := Cache{Mapper: &sync.Map{}, Size: 1024}
 	h := mux.NewRouter()
 	h.HandleFunc("/", a.Keys).Methods(http.MethodGet)
 	h.HandleFunc("/{_:.+}", a.Get).Methods(http.MethodGet)
